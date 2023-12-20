@@ -42,6 +42,10 @@ type Instancer interface {
 	Instance() Instance
 }
 
+type Servicer interface {
+	Services() interface{}
+}
+
 // Standard represents a complete interface, which includes
 // Initializer, Cleaner, StartStopper, Validator and Instancer.
 type Standard interface {
@@ -50,6 +54,7 @@ type Standard interface {
 	StartStopper
 	Validator
 	Instancer
+	Servicer
 }
 
 // Instance is a user-defined application instance.
@@ -80,6 +85,13 @@ func (ctx Context) MustLoad(name string) Instance {
 		panic(err)
 	}
 	return instance
+}
+
+func (ctx Context) GetServices(name string) (interface{}, error) {
+	if app, ok := ctx.required[name]; ok {
+		return app.Instance.Services(), nil
+	}
+	return nil, fmt.Errorf("app %q is not required", name)
 }
 
 // Config returns the configuration of the application associated with this
@@ -151,7 +163,7 @@ func (a *App) Install(ctx context.Context, lc Lifecycle, before, after func(*App
 	case stateInstalled:
 		return nil // Do nothing since the application has already been installed.
 	case stateInstalling:
-		return fmt.Errorf("circular dependency is detected for app %q", a.Name)
+		return nil
 	}
 
 	// Mark the state as `installing`.
@@ -316,4 +328,11 @@ func (s *standard) Instance() Instance {
 		return instancer.Instance()
 	}
 	return s.instance
+}
+
+func (s *standard) Services() interface{} {
+	if instancer, ok := s.instance.(Servicer); ok {
+		return instancer.Services()
+	}
+	return nil
 }
